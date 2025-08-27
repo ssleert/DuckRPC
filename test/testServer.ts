@@ -1,7 +1,11 @@
-import * as duckrpc from "../index.ts";
+import * as duckrpc from "../src/server.ts";
 
 class NumberService {
-  add(a: number, b: number) {
+  greeting(name: string): string {
+    return `Hello, ${name}!`;
+  }
+
+  add(a: number, b: number): number {
     return a + b;
   }
 }

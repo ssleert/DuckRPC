@@ -1,13 +1,15 @@
-import * as duckrpc from "../client.ts";
+import * as duckrpc from "../src/client.ts";
 import { NumberService } from "./testServer.ts";
 
-const numberService = await duckrpc.newClient<NumberService>(
-  "http://localhost:8000"
-)
 
-const a = 1
-const b = 2
+(async () => {
+  const numberService = await duckrpc.newClient<NumberService>(
+    "http://localhost:8000"
+  )
 
-const ab = await numberService.add(a, b)
+  console.time("asd")
 
-console.log(ab)
+    console.log(await numberService.greeting("asd"))
+  console.timeEnd("asd")
+})()
+
