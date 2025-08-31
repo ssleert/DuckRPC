@@ -1,5 +1,5 @@
-import express from "express";
-import bodyParser from "body-parser";
+import http from "node:http";
+import { Buffer } from "node:buffer";
 import * as duckrpc from "../src/server.ts";
 
 class NumberService {
@@ -15,11 +15,6 @@ class NumberService {
 const service = new NumberService();
 const rpc = new duckrpc.Server(service);
 
-const app = express();
-const port = 8000;
+const server = http.createServer(rpc.getNodeHandler());
 
-app.post(rpc.routes, bodyParser.json(), rpc.getExpressHandler());
-
-app.listen(port, () => {
-  console.log(`App listening on port ${port}`);
-});
+server.listen(8000);

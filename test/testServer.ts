@@ -12,7 +12,7 @@ class NumberService {
 
 const service = new NumberService();
 
-export { NumberService }
+export { NumberService };
 export default {
-  fetch: new duckrpc.Server(service).getFetch()
-}
+  fetch: new duckrpc.Server(service).getFetch(),
+};

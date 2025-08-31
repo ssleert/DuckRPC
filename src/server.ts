@@ -1,5 +1,24 @@
 type UnknownFunction = (...args: unknown[]) => unknown;
 
+type NodeBuffer = {
+  concat(bufs: Uint8Array<ArrayBufferLike>[]): NodeBuffer;
+  toString(): string;
+};
+
+type NodeHttpReq = {
+  url?: string;
+  on(
+    event: "data",
+    cb: (data: Uint8Array<ArrayBufferLike>) => void,
+  ): NodeHttpReq;
+  on(event: "end", cb: () => void): NodeHttpReq;
+};
+
+type NodeHttpRes = {
+  statusCode: number;
+  end(body: string): void;
+};
+
 type ExpressReq = {
   url: string;
   body: unknown;
@@ -103,9 +122,9 @@ export class Server<T> {
         argsNames.push(`args[${i}]`);
       }
 
-      const fnStr = `((args) => this.#instance.${methodName}(${
-        argsNames.join(", ")
-      }))`;
+      const fnStr = `(args) => {
+        return this.#instance.${methodName}(${argsNames.join(", ")})
+      }`;
 
       const fnValue = eval(`(${fnStr})`).bind(this);
       nameWrappers[methodName] = fnValue;
@@ -160,6 +179,50 @@ export class Server<T> {
       res.status(status).send(
         JSON.stringify(body),
       );
+    };
+  }
+
+  getNodeHandler() {
+    let _Buffer: NodeBuffer;
+    import("node:buffer").then(
+      (m) => _Buffer = m.Buffer as unknown as NodeBuffer,
+    );
+
+    return async (req: NodeHttpReq, res: NodeHttpRes) => {
+      try {
+        const method = req.url?.split("/").at(-1) as string;
+
+        if (method === Server.reflectRoute) {
+          res.end(this.#reflectMetadataJSON);
+          return;
+        }
+
+        const args: unknown[] = await (new Promise((resolve, reject) => {
+          const body: Uint8Array<ArrayBufferLike>[] = [];
+          req.on("data", (chunk) => {
+            body.push(chunk);
+          }).on("end", () => {
+            try {
+              resolve(
+                JSON.parse(
+                  _Buffer.concat(body).toString(),
+                ),
+              );
+            } catch(e) {
+              reject(e)
+            }
+          });
+        }));
+
+        const [body, status] = await this.callMethod(method, args);
+
+        res.statusCode = status;
+        res.end(
+          JSON.stringify(body),
+        );
+      } catch(e) {
+        console.error(e)
+      }
     };
   }
 }
