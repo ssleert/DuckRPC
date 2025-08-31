@@ -1,8 +1,10 @@
 type UnknownFunction = (...args: unknown[]) => unknown;
 
 type NodeBuffer = {
-  concat(bufs: Uint8Array<ArrayBufferLike>[]): NodeBuffer;
+  length: number
+  concat(bufs: Uint8Array<ArrayBufferLike>[] | NodeBuffer[]): NodeBuffer;
   toString(): string;
+  from(buf: ArrayBufferLike): NodeBuffer
 };
 
 type NodeHttpReq = {
@@ -18,6 +20,19 @@ type NodeHttpRes = {
   statusCode: number;
   end(body: string): void;
 };
+
+interface UwsReq {
+  getUrl(): string;
+}
+
+interface UwsRes {
+  aborted?: boolean | undefined
+  onData(callback: (chunk: ArrayBuffer, isLast: boolean) => void): void;
+  writeStatus(status: string): UwsRes;
+  end(body: string): void;
+  onAborted(callback: () => void): void;
+  cork(callback: () => void): void;
+}
 
 type ExpressReq = {
   url: string;
@@ -71,6 +86,8 @@ export class Server<T> {
   #reflectMetadataJSON!: string;
   #methodArgumentsMappers!: Record<string, UnknownFunction>;
 
+  #nodeBuffer!: NodeBuffer
+
   constructor(
     instance: T,
   ) {
@@ -81,6 +98,15 @@ export class Server<T> {
     this.#reflectMetadata = this.#getMethodNamesWithArgsCount();
     this.#reflectMetadataJSON = JSON.stringify(this.#reflectMetadata);
     this.#methodArgumentsMappers = this.#generateMethodArgumentsMapppers();
+
+  }
+
+  #loadNodeBuffer() {
+    import("node:buffer").then(buffer => {
+      this.#nodeBuffer = buffer.Buffer as unknown as NodeBuffer
+    }).catch((e) => {
+      console.error("Cant get NodeJS Buffer object.")
+    })
   }
 
   get routes() {
@@ -164,7 +190,11 @@ export class Server<T> {
     return this.getFetch();
   }
 
-  getExpressHandler() {
+  getExpressHandler(bodyText = false) {
+    const getBody = bodyText 
+      ? (body: string) => JSON.parse(body) 
+      : (body: unknown) => body
+
     return async (req: ExpressReq, res: ExpressRes) => {
       const method = req.url.split("/").at(-1) as string;
 
@@ -173,20 +203,20 @@ export class Server<T> {
         return;
       }
 
-      const args = req.body as unknown[];
+      const args = getBody(req.body as string);
       const [body, status] = await this.callMethod(method, args);
 
-      res.status(status).send(
+      res.status(status)
+      res.send(
         JSON.stringify(body),
       );
     };
   }
 
   getNodeHandler() {
-    let _Buffer: NodeBuffer;
-    import("node:buffer").then(
-      (m) => _Buffer = m.Buffer as unknown as NodeBuffer,
-    );
+    if (!this.#nodeBuffer) {
+      this.#loadNodeBuffer() 
+    }
 
     return async (req: NodeHttpReq, res: NodeHttpRes) => {
       try {
@@ -205,7 +235,7 @@ export class Server<T> {
             try {
               resolve(
                 JSON.parse(
-                  _Buffer.concat(body).toString(),
+                  this.#nodeBuffer.concat(body).toString(),
                 ),
               );
             } catch(e) {
@@ -221,6 +251,61 @@ export class Server<T> {
           JSON.stringify(body),
         );
       } catch(e) {
+        console.error(e)
+      }
+    };
+  }
+
+  getuWebSocketsHandler() {
+    if (!this.#nodeBuffer) {
+      this.#loadNodeBuffer();
+    }
+
+    return async (res: UwsRes, req: UwsReq) => {
+      const method = req.getUrl().split("/").at(-1) as string;
+      if (method === Server.reflectRoute) {
+        res.cork(() => {
+          res.end(this.#reflectMetadataJSON);
+        })
+        return;
+      }
+
+      res.onAborted(() => {
+        res.aborted = true;
+      });
+
+      try {
+        const args: unknown[] = await new Promise((resolve, reject) => {
+          let buffer: NodeBuffer | undefined;
+          res.onData((chunk: ArrayBuffer, isLast: boolean) => {
+            if (res.aborted) {
+              reject(new Error("Request Aborted"))
+            }
+
+            const currentChunk = this.#nodeBuffer.from(chunk);
+            buffer = buffer ? this.#nodeBuffer.concat([buffer, currentChunk]) : currentChunk;
+
+            if (isLast) {
+              try {
+                resolve(JSON.parse(buffer.toString()));
+              } catch (e) {
+                reject(new Error('Invalid JSON payload'));
+              }
+            }
+          });
+        });
+
+        const [body, status] = await this.callMethod(method, args);
+
+        if (res.aborted) {
+          return
+        }
+
+        res.cork(() => {
+          res.writeStatus(status.toString());
+          res.end(JSON.stringify(body));
+        })
+      } catch (e) {
         console.error(e)
       }
     };

@@ -1,10 +1,13 @@
 {
+  "type": "module",
   "devDependencies": {
     "@types/express": "^5.0.3",
     "@types/node": "^24.3.0",
     "body-parser": "^2.2.0",
     "express": "^5.1.0",
     "ts-node": "^10.9.2",
-    "tsx": "^4.20.5"
+    "tsx": "^4.20.5",
+    "ultimate-express": "^2.0.9",
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.52.0"
   }
 }

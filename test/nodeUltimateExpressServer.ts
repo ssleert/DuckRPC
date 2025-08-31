@@ -1,4 +1,4 @@
-import express from "express";
+import express from "ultimate-express";
 import * as duckrpc from "../src/server.ts";
 
 class NumberService {

@@ -1,4 +1,4 @@
-import express from "express";
+import uWS from "uWebSockets.js";
 import * as duckrpc from "../src/server.ts";
 
 class NumberService {
@@ -14,10 +14,12 @@ class NumberService {
 const service = new NumberService();
 const rpc = new duckrpc.Server(service);
 
-const app = express();
+const app = uWS.App();
 const port = 8000;
 
-app.post(rpc.routes, express.json(), rpc.getExpressHandler());
+rpc.routes.forEach(
+  route => app.post(route, rpc.getuWebSocketsHandler())
+)
 
 app.listen(port, () => {
   console.log(`App listening on port ${port}`);
