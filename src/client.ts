@@ -13,9 +13,16 @@ export type Client<T> = {
     : never;
 };
 
-export const newClient = async <T>(url: string) => {
+const ctxHeaderName = "duckrpc-ctx";
+
+export type Interceptor = (
+  ctx: Record<string, string>,
+  method: string,
+  args: unknown[],
+) => Promise<boolean> | boolean;
+
+export const newClient = async <T>(url: string, interceptors: Interceptor[] = []) => {
   const method = "POST";
-  const headers = { "Content-Type": "application/json" };
   const keepalive = true;
 
   const metadataUrl = url + "/___reflect";
@@ -31,6 +38,18 @@ export const newClient = async <T>(url: string) => {
 
   for (const methodName in metadata) {
     clientHandlers[methodName] = async (...args: unknown[]) => {
+      const ctx: Record<string, string> = {}
+      for (const intr of interceptors) {
+        if (!intr(ctx, method, args)) {
+          break
+        }
+      }
+
+      const headers = { 
+        "Content-Type": "application/json",
+        ctxHeaderName: JSON.stringify(ctx),
+      };
+
       const body = JSON.stringify(args);
       const res = await fetch(url + "/" + methodName, {
         method,

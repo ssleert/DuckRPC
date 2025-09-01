@@ -18,8 +18,8 @@ const app = uWS.App();
 const port = 8000;
 
 rpc.routes.forEach(
-  route => app.post(route, rpc.getuWebSocketsHandler())
-)
+  (route) => app.post(route, rpc.getuWebSocketsHandler()),
+);
 
 app.listen(port, () => {
   console.log(`App listening on port ${port}`);
