@@ -19,6 +19,12 @@ const port = 8000;
 
 app.post(rpc.routes, express.json(), rpc.getExpressHandler());
 
+rpc.addInterceptor(async (ctx, method, args) => {
+  console.log(ctx)
+  console.log(method);
+  return true;
+});
+
 app.listen(port, () => {
   console.log(`App listening on port ${port}`);
 });

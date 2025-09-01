@@ -21,6 +21,11 @@ rpc.routes.forEach(
   (route) => app.post(route, rpc.getuWebSocketsHandler()),
 );
 
+rpc.addInterceptor((ctx, method, args) => {
+  console.log(ctx.swag)
+  return true;
+});
+
 app.listen(port, () => {
   console.log(`App listening on port ${port}`);
 });

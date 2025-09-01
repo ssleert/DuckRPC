@@ -47,7 +47,7 @@ export const newClient = async <T>(url: string, interceptors: Interceptor[] = []
 
       const headers = { 
         "Content-Type": "application/json",
-        ctxHeaderName: JSON.stringify(ctx),
+        [ctxHeaderName]: JSON.stringify(ctx),
       };
 
       const body = JSON.stringify(args);

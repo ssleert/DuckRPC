@@ -14,7 +14,7 @@ type NodeHttpReq = {
     cb: (data: Uint8Array<ArrayBufferLike>) => void,
   ): NodeHttpReq;
   on(event: "end", cb: () => void): NodeHttpReq;
-  getHeader(key: string): string | undefined;
+  headers: Record<string, string>;
 };
 
 type NodeHttpRes = {
@@ -206,7 +206,7 @@ export class Server<T extends object> {
 
   #compileInterceptors() {
     let fnStr = `
-      (ctx, method, args) => {
+      async (ctx, method, args) => {
         let flag = true;
     `;
     for (let i = 0; i < this.#interceptors.length; ++i) {
@@ -246,7 +246,7 @@ export class Server<T extends object> {
     args: unknown[],
   ): Promise<[unknown, number]> {
     try {
-      this.#compiledInterceptor(ctx, method, args)
+      await this.#compiledInterceptor(ctx, method, args)
       const r = await this.#methodArgumentsMappers[method](args);
       return [r, 200];
     } catch (e) {
@@ -311,7 +311,7 @@ export class Server<T extends object> {
           return;
         }
 
-        const ctx = this.#getCtxFromHeader(req.getHeader(Server.ctxHeaderName))
+        const ctx = this.#getCtxFromHeader(req.headers[Server.ctxHeaderName])
 
         const args: unknown[] = await (new Promise((resolve, reject) => {
           const body: Uint8Array<ArrayBufferLike>[] = [];
